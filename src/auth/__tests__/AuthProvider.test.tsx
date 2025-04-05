@@ -17,13 +17,18 @@ const mockFirebaseAuth = vi.hoisted(() => ({
 
 vi.mock('firebase/auth', async () => ({
   ...mockFirebaseAuth,
-  GoogleAuthProvider: class MockGoogleProvider { } // Mock the class instead of function
+  GoogleAuthProvider: class MockGoogleProvider {
+    setCustomParameters() { return this; }
+  },
+  GithubAuthProvider: class MockGithubProvider {},
+  TwitterAuthProvider: class MockTwitterProvider {}
 }))
 
-vi.mock('./types', () => ({
+vi.mock('../types', () => ({
   AuthProviders: new Map([
     ['google', {}]
-  ])
+  ]),
+  AUTH_MODES: ['standalone', 'sso-provider', 'sso-consumer']
 }))
 
 vi.mock('../components/LoginView', () => ({
@@ -39,12 +44,15 @@ const mockAuth = {
   currentUser: null
 } satisfies Partial<Auth> as Auth
 
-const mockRestClient = {
-  request: vi.fn().mockResolvedValue({ token: 'exchanged-token' })
-}
-vi.mock('../api/RestClient', () => ({
-  RestClient: vi.fn().mockImplementation(() => mockRestClient)
-}))
+// Global fetch mock
+vi.stubGlobal('fetch', vi.fn(() => 
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ token: 'exchanged-token' }),
+    statusText: 'OK',
+    status: 200
+  })
+))
 
 function TestConsumer({ onContext }: { onContext: (ctx: AuthContextType) => void }) {
   const context = useContext(AuthContext)
@@ -205,6 +213,16 @@ describe('AuthProvider in standalone mode', () => {
     unmount()
     expect(unsubscribe).toHaveBeenCalled()
   })
+  
+  it('should keep its Login property as LoginView', () => {
+    render(
+      <AuthProvider auth={mockAuth}>
+        <div>Test</div>
+      </AuthProvider>
+    )
+    
+    expect(AuthProvider.Login).not.toBeUndefined()
+  })
 })
 
 describe('AuthProvider in SSO provider mode', () => {
@@ -272,7 +290,10 @@ describe('AuthProvider in SSO provider mode', () => {
       authStateCallback?.(mockUser)
     })
 
-    await waitFor(() => expect(mockRestClient.request).toHaveBeenCalledWith('sso?scope=app.test.com', { method: 'GET' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('sso?scope=app.test.com'),
+      expect.objectContaining({ method: 'GET' })
+    ))
 
     expect(windowLocationHref).toBe('http://app.test.com/callback?token=exchanged-token')
   })
@@ -303,8 +324,9 @@ describe('AuthProvider in SSO provider mode', () => {
   })
 
   it('should handle token exchange errors', async () => {
-    const exchangeError = new Error('Exchange failed');
-    mockRestClient.request.mockRejectedValueOnce(exchangeError);
+    // Mock fetch to reject for this test
+    const fetchMock = vi.fn().mockRejectedValueOnce(new Error('Exchange failed'));
+    vi.stubGlobal('fetch', fetchMock);
 
     render(
       <AuthProvider auth={mockAuth} loginServer="http://login.test.com">
@@ -318,7 +340,10 @@ describe('AuthProvider in SSO provider mode', () => {
       }
     }).rejects.toThrow('Token exchange failed:');
 
-    expect(mockRestClient.request).toHaveBeenCalledWith('sso?scope=app.test.com', { method: 'GET' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('sso?scope=app.test.com'),
+      expect.objectContaining({ method: 'GET' })
+    );
   })
 })
 
