@@ -1,9 +1,9 @@
 import { SiGithub, SiGoogle } from '@icons-pack/react-simple-icons';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { useAuth } from '../auth/hooks/useAuth';
 import { useState, type FormEvent } from 'react';
 import { AuthProviders, type SupportedProviders } from '../auth/types';
+import { useAuthStore } from '../auth/store';
 
 interface LoginProps {
     onLoginError: (error?: string) => void;
@@ -13,7 +13,7 @@ export function LoginForm({ onLoginError }: LoginProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    const { loginWithProvider, loginWithEmailAndPassword } = useAuth();
+    const { loginWithProvider, loginWithEmailAndPassword } = useAuthStore();
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();

@@ -4,13 +4,14 @@ import type { AuthMode, AuthProviderProps, AuthState, SSOResponse } from './type
 import { AuthProviders, type SupportedProviders } from './types';
 import { AuthContext } from './AuthContext';
 import { LoginView } from '../components/LoginView';
+import { updateAuthStore } from './store';
 
 /**
  * Universal authentication provider that handles all auth modes:
  * - Standalone: direct Firebase auth with providers or email/password
  * - SSO Provider: handles login and token exchange for other apps
  * - SSO Consumer: receives and processes tokens from SSO provider
- * 
+ *
  * Mode selection is automatic based on URL parameters and configuration.
  * This component handles the entire authentication flow and context provision.
  */
@@ -44,13 +45,13 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
      * Handles formatting of API paths to ensure proper structure:
      * - Adds /api/v1 if needed
      * - Ensures proper version path
-     * 
+     *
      * @returns Formatted API base URL
      */
     const getApiBaseUrl = useCallback(() => {
         const baseUrl = loginServer ?? "https://kortexa.ai";
         const url = new URL(baseUrl);
-        
+
         // Add /api/v1 to the path if it's not already there
         if (!url.pathname.includes('/api')) {
             url.pathname = url.pathname.replace(/\/+$/, '') + '/api/v1';
@@ -58,14 +59,14 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
             // If the path includes /api but not a version, add the version
             url.pathname = url.pathname.replace(/\/+$/, '') + '/v1';
         }
-        
+
         // Remove trailing slash for consistency
         return url.toString().replace(/\/$/, '');
     }, [loginServer]);
 
     /**
      * Creates authorization headers for API requests
-     * 
+     *
      * @param token JWT token for authorization
      * @returns Headers object with Authorization and Content-Type
      */
@@ -77,7 +78,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
     /**
      * Exchanges Firebase token for an SSO token from the SSO server
      * This allows cross-domain authentication between applications
-     * 
+     *
      * @param token Firebase JWT token
      * @param scope The hostname/scope requesting the token
      * @returns SSO token for the requested scope
@@ -86,7 +87,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
     const exchangeToken = useCallback(async (token: string, scope: string) => {
         const baseUrl = getApiBaseUrl();
         const url = `${baseUrl}/sso?scope=${scope}`;
-        
+
         // Make direct fetch request to the SSO endpoint
         const response = await fetch(url, {
             method: 'GET',
@@ -102,7 +103,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
 
         // Parse response JSON
         const data = await response.json() as SSOResponse;
-        
+
         // Validate token in response
         if (!data?.token) {
             throw new Error('Invalid token response from SSO server');
@@ -115,7 +116,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
      * Handles redirect flow for SSO provider mode
      * 1. Exchanges token for a scope-specific token
      * 2. Redirects to the return URL with the token
-     * 
+     *
      * @param token Firebase JWT token
      */
     const handleProviderRedirect = useCallback(async (token: string) => {
@@ -126,7 +127,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
             try {
                 // Get custom token for the specific domain
                 const customToken = await exchangeToken(token, (new URL(returnUrl)).hostname);
-                
+
                 // Redirect back to return URL with token
                 const redirectUrl = new URL(returnUrl);
                 redirectUrl.searchParams.set('token', customToken);
@@ -140,7 +141,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
     /**
      * Initiates SSO login flow by redirecting to the login server
      * Only available in SSO consumer mode
-     * 
+     *
      * @throws Error if called in standalone or SSO provider mode
      */
     const loginWithSSO = useCallback(async () => {
@@ -156,7 +157,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
     /**
      * Initiates social login with a provider (Google, GitHub, etc.)
      * Not available in SSO consumer mode
-     * 
+     *
      * @param providerName The provider to use for authentication
      * @throws Error if called in SSO consumer mode or with invalid provider
      */
@@ -176,7 +177,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
     /**
      * Initiates email/password login
      * Not available in SSO consumer mode
-     * 
+     *
      * @param email User email
      * @param password User password
      * @throws Error if called in SSO consumer mode
@@ -206,7 +207,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
         /**
          * Processes Firebase auth state changes
          * Updates local state and handles SSO provider redirects
-         * 
+         *
          * @param user The Firebase user object or null if signed out
          */
         const handleUser = async (user: User | null) => {
@@ -250,7 +251,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
             try {
                 // Sign in with the custom token
                 await signInWithCustomToken(auth, token);
-                
+
                 // Clean up URL by removing token parameter
                 const cleanUrl = `${window.location.origin}${window.location.pathname}`;
                 window.history.replaceState({}, '', cleanUrl);
@@ -262,7 +263,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
 
         // Subscribe to Firebase auth state changes
         const unsubAuthState = onAuthStateChanged(auth, handleUser);
-        
+
         // Process SSO token if present
         handleSSOToken();
 
@@ -288,6 +289,12 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
 
     // Set display name for debugging purposes
     AuthContext.displayName = `kortexa.ai:auth:${mode}`;
+
+    // Update zustand store when context value changes
+    useEffect(() => {
+        updateAuthStore(value);
+        console.log('Auth store updated:', value);
+    }, [value]);
 
     return (
         <AuthContext.Provider value={value}>

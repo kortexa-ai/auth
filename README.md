@@ -107,8 +107,8 @@ which the SSO consumer will attempt to exchange for a Firebase token.
 You can create a custom login UI by using the `useAuth` hook:
 
 ```jsx
-import { useAuth } from '@kortexa/auth';
-import type { SupportedProviders } from '@kortexa/auth';
+import { useAuthStore } from '@kortexa-ai/auth';
+import type { SupportedProviders } from '@kortexa-ai/auth';
 
 function MyCustomLoginView({ title, children }) {
   const { 
@@ -118,7 +118,7 @@ function MyCustomLoginView({ title, children }) {
     loginWithSSO,
     logout,
     mode 
-  } = useAuth();
+  } = useAuthStore();
 
   // If user is already authenticated, render children
   if (currentUser) return children;

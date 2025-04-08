@@ -35,17 +35,26 @@ export default defineConfig({
         rollupOptions: {
             external: [
                 'react',
-                'react-dom',
                 'react/jsx-runtime',
+                'react-dom',
+                'zustand',
+                'firebase',
+                'firebase/app',
                 'firebase/auth',
             ],
             output: {
                 globals: {
                     react: 'React',
-                    'react-dom': 'ReactDOM',
                     'react/jsx-runtime': 'jsxRuntime',
+                    'react-dom': 'ReactDOM',
+                    zustand: 'Zustand',
+                    firebase: 'firebase',
+                    'firebase/app': 'firebase.app',
+                    'firebase/auth': 'firebase.auth',
                 },
             },
         },
+        sourcemap: true,
+        emptyOutDir: true, // Usually good practice
     },
-})
+});
