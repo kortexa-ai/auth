@@ -4,7 +4,6 @@ import type { AuthMode, AuthProviderProps, AuthState, SSOResponse } from './type
 import { AuthProviders, type SupportedProviders } from './types';
 import { AuthContext } from './AuthContext';
 import { LoginView } from '../components/LoginView';
-import { updateAuthStore } from './store';
 
 /**
  * Universal authentication provider that handles all auth modes:
@@ -289,12 +288,6 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
 
     // Set display name for debugging purposes
     AuthContext.displayName = `kortexa.ai:auth:${mode}`;
-
-    // Update zustand store when context value changes
-    useEffect(() => {
-        updateAuthStore(value);
-        console.log('Auth store updated:', value);
-    }, [value]);
 
     return (
         <AuthContext.Provider value={value}>

@@ -2,8 +2,8 @@ import { useState, type ReactNode, type PropsWithChildren, useCallback } from 'r
 import { LogIn, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { LoginForm } from './LoginForm';
-import { useAuthStore } from '../auth/store';
 import type { SupportedProviders } from '../auth/types';
+import { useAuth } from '../auth/hooks/useAuth';
 
 interface LoginViewProps {
     title: ReactNode;
@@ -36,7 +36,7 @@ export function LoginView({
         isLoading: false,
     });
 
-    const { currentUser, mode, loginWithProvider, loginWithSSO } = useAuthStore();
+    const { currentUser, mode, loginWithProvider, loginWithSSO } = useAuth();
 
     const onLoginClick = useCallback(async () => {
         if (mode === 'sso-consumer') {

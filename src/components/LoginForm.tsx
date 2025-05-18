@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useState, type FormEvent } from 'react';
 import { AuthProviders, type SupportedProviders } from '../auth/types';
-import { useAuthStore } from '../auth/store';
+import { useAuth } from '../auth/hooks/useAuth';
 
 interface LoginProps {
     onLoginError: (error?: string) => void;
@@ -13,7 +13,7 @@ export function LoginForm({ onLoginError }: LoginProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    const { loginWithProvider, loginWithEmailAndPassword } = useAuthStore();
+    const { loginWithProvider, loginWithEmailAndPassword } = useAuth();
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
