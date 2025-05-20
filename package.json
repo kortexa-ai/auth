@@ -1,6 +1,6 @@
 {
     "name": "@kortexa-ai/auth",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "description": "Small authentication helper",
     "copyright": "Copyright © 2025 kortexa.ai",
     "author": {
