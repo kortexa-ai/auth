@@ -28,6 +28,33 @@ export interface AuthState {
     token: string;
     loading: boolean;
     mode: AuthMode;
+    allowAnonymous: boolean;
+    forceLogin: boolean;
+}
+
+/**
+ * Auth context type
+ * @method login - Force the login flow when anonymous access is allowed
+ * @method loginWithSSO - Login with SSO
+ * @method loginWithProvider - Login with a provider
+ * @method loginWithEmailAndPassword - Login with email and password
+ * @method logout - Logout
+ * @method clearForceLogin - Clear the force login state
+ */
+export interface AuthContextType extends AuthState {
+    login: () => void;
+    loginWithSSO: () => Promise<void>;
+    loginWithProvider: (provider: SupportedProviders) => Promise<void>;
+    loginWithEmailAndPassword: (
+        email: string,
+        password: string
+    ) => Promise<void>;
+    logout: () => Promise<void>;
+    clearForceLogin: () => void;
+}
+
+export interface SSOResponse {
+    token: string;
 }
 
 /**
@@ -35,6 +62,7 @@ export interface AuthState {
  * @param auth Firebase Auth instance
  * @param loginRedirect Optional redirect URL to SSO provider for SSO login
  * @param loginServer Optional login server URL for SSO token exchange
+ * @param allowAnonymous Optional flag to allow anonymous access
  *
  * loginRedirect and loginServer can't be used together
  * If loginRedirect is provided, the component will act as SSO consumer
@@ -44,15 +72,5 @@ export interface AuthProviderProps {
     auth: Auth;
     loginRedirect?: string;
     loginServer?: string;
-}
-
-export interface AuthContextType extends AuthState {
-    loginWithSSO: () => Promise<void>;
-    loginWithProvider: (provider: SupportedProviders) => Promise<void>;
-    loginWithEmailAndPassword: (email: string, password: string) => Promise<void>;
-    logout: () => Promise<void>;
-}
-
-export interface SSOResponse {
-    token: string;
+    allowAnonymous?: boolean;
 }

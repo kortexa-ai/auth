@@ -1,7 +1,7 @@
 import { SiGithub, SiGoogle } from '@icons-pack/react-simple-icons';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useCallback } from 'react';
 import { AuthProviders, type SupportedProviders } from '../auth/types';
 import { useAuth } from '../auth/hooks/useAuth';
 
@@ -13,29 +13,36 @@ export function LoginForm({ onLoginError }: LoginProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    const { loginWithProvider, loginWithEmailAndPassword } = useAuth();
+    const { loginWithProvider, loginWithEmailAndPassword, clearForceLogin } = useAuth();
 
-    const handleSubmit = async (e: FormEvent) => {
+    const handleSubmit = useCallback(async (e: FormEvent) => {
         e.preventDefault();
         try {
             await loginWithEmailAndPassword(email, password);
         } catch (err) {
             onLoginError((err as Error).message);
         }
-    };
+    }, [email, password, loginWithEmailAndPassword, onLoginError]);
 
-    const handleLogin = async (provider: SupportedProviders) => {
+    const handleLogin = useCallback(async (provider: SupportedProviders) => {
         try {
             await loginWithProvider(provider);
         } catch (err) {
             onLoginError((err as Error).message);
         }
-    };
+    }, [loginWithProvider, onLoginError]);
+
+    const handleReset = useCallback((e: FormEvent) => {
+        e.preventDefault();
+        clearForceLogin();
+        setEmail('');
+        setPassword('');
+    }, [clearForceLogin]);
 
     return (
         <div className="w-full max-w-md p-6 bg-white rounded-xl shadow-md ring-1 ring-zinc-200/50">
             {AuthProviders.has('email') && (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} onReset={handleReset} className="space-y-4">
                     <div className="space-y-1">
                         <Input
                             type="email"

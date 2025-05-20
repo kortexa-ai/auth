@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type PropsWithChildren, useCallback } from 'react';
+import { useState, type ReactNode, type PropsWithChildren, useCallback, useEffect } from 'react';
 import { LogIn, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { LoginForm } from './LoginForm';
@@ -29,6 +29,8 @@ export function LoginView({
     background,
     children,
 }: PropsWithChildren<LoginViewProps>) {
+    const { currentUser, mode, allowAnonymous, forceLogin, loginWithProvider, loginWithSSO } = useAuth();
+
     const [loginState, setLoginState] = useState<LoginState>({
         showForm: false,
         showError: false,
@@ -36,7 +38,11 @@ export function LoginView({
         isLoading: false,
     });
 
-    const { currentUser, mode, loginWithProvider, loginWithSSO } = useAuth();
+    useEffect(() => {
+        if (forceLogin) {
+            setLoginState((prev) => ({ ...prev, showForm: true }));
+        }
+    }, [forceLogin]);
 
     const onLoginClick = useCallback(async () => {
         if (mode === 'sso-consumer') {
@@ -73,10 +79,11 @@ export function LoginView({
         }));
     }, []);
 
-    if (currentUser) return children;
+    const noLoginRequired = (currentUser || allowAnonymous) && !forceLogin;
 
-    return (
-        <div className="relative h-screen w-screen overflow-hidden">
+    return (noLoginRequired
+        ? children
+        : <div className="relative h-screen w-screen overflow-hidden">
             {/* Background Layer (unchanged full size) */}
             {background && (
                 <div className="absolute inset-0 z-0">

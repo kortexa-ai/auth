@@ -14,7 +14,13 @@ import { LoginView } from '../components/LoginView';
  * Mode selection is automatic based on URL parameters and configuration.
  * This component handles the entire authentication flow and context provision.
  */
-export function AuthProvider({ auth, loginRedirect, loginServer, children }: PropsWithChildren<AuthProviderProps>) {
+export function AuthProvider({
+    auth,
+    loginRedirect,
+    loginServer,
+    allowAnonymous = false,
+    children
+}: PropsWithChildren<AuthProviderProps>) {
     /**
      * Determine the authentication mode based on URL parameters and props
      * - sso-consumer: When token is in URL or loginRedirect is provided without no_sso param
@@ -37,6 +43,8 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
         token: "",
         loading: true,
         mode: mode,
+        allowAnonymous: allowAnonymous,
+        forceLogin: false,
     });
 
     /**
@@ -138,6 +146,13 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
     }, [exchangeToken, mode]);
 
     /**
+     * Initiates the login flow and shows the login form
+     */
+    const login = useCallback(() => {
+        setState((prev) => ({ ...prev, forceLogin: true }));
+    }, [setState]);
+
+    /**
      * Initiates SSO login flow by redirecting to the login server
      * Only available in SSO consumer mode
      *
@@ -198,6 +213,13 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
     }, [auth]);
 
     /**
+     * Clear the force login state
+     */
+    const clearForceLogin = useCallback(() => {
+        setState((prev) => ({ ...prev, forceLogin: false }));
+    }, [setState]);
+
+    /**
      * Main effect for handling auth state changes and SSO token processing
      */
     useEffect(() => {
@@ -219,7 +241,8 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
                     ...prev,
                     currentUser: user,
                     token: newToken,
-                    loading: false
+                    loading: false,
+                    forceLogin: false
                 }));
 
                 // Handle redirect flow for SSO provider mode
@@ -232,7 +255,8 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
                     ...prev,
                     currentUser: null,
                     token: "",
-                    loading: false
+                    loading: false,
+                    forceLogin: false
                 }));
             }
         };
@@ -256,7 +280,7 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
                 window.history.replaceState({}, '', cleanUrl);
             } catch (error) {
                 console.error('SSO token signin failed:', error);
-                setState(prev => ({ ...prev, loading: false }));
+                setState(prev => ({ ...prev, loading: false, forceLogin: false }));
             }
         };
 
@@ -279,12 +303,14 @@ export function AuthProvider({ auth, loginRedirect, loginServer, children }: Pro
      */
     const value = useMemo(() => ({
         ...state,
+        login,
         loginWithSSO,
         loginWithProvider,
         loginWithEmailAndPassword,
         logout,
+        clearForceLogin,
         mode
-    }), [state, loginWithSSO, loginWithProvider, loginWithEmailAndPassword, logout, mode]);
+    }), [state, login, loginWithSSO, loginWithProvider, loginWithEmailAndPassword, logout, clearForceLogin, mode]);
 
     // Set display name for debugging purposes
     AuthContext.displayName = `kortexa.ai:auth:${mode}`;
