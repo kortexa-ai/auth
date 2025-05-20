@@ -14,9 +14,12 @@ coverage/
 *.sqlite
 .DS_Store
 
-# Firebase service account
+# Firebase
+.firebase/
 *service-account*.json
 *serviceAccount*.json
+google-services.json
+GoogleService-Info.plist
 
 # Editor directories and files
 .vscode/*
