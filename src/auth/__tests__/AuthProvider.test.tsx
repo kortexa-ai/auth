@@ -45,7 +45,7 @@ const mockAuth = {
 } satisfies Partial<Auth> as Auth
 
 // Global fetch mock
-vi.stubGlobal('fetch', vi.fn(() => 
+vi.stubGlobal('fetch', vi.fn(() =>
   Promise.resolve({
     ok: true,
     json: () => Promise.resolve({ token: 'exchanged-token' }),
@@ -147,7 +147,7 @@ describe('AuthProvider in standalone mode', () => {
     )
 
     await act(async () => {
-      await contextValue.loginWithProvider('google')
+      await contextValue.loginWithProvider('google.com')
     })
 
     expect(contextValue.mode).toBe('standalone')
@@ -213,14 +213,14 @@ describe('AuthProvider in standalone mode', () => {
     unmount()
     expect(unsubscribe).toHaveBeenCalled()
   })
-  
+
   it('should keep its Login property as LoginView', () => {
     render(
       <AuthProvider auth={mockAuth}>
         <div>Test</div>
       </AuthProvider>
     )
-    
+
     expect(AuthProvider.Login).not.toBeUndefined()
   })
 })
@@ -306,7 +306,7 @@ describe('AuthProvider in SSO provider mode', () => {
     )
 
     await act(async () => {
-      await contextValue.loginWithProvider('google')
+      await contextValue.loginWithProvider('google.com')
     })
 
     expect(contextValue.mode).toBe('sso-provider')
@@ -469,7 +469,7 @@ describe('AuthProvider in SSO consumer mode', () => {
       </AuthProvider>
     )
 
-    await expect(contextValue.loginWithProvider('google')).rejects.toThrow('Provider login not available in SSO consumer mode')
+    await expect(contextValue.loginWithProvider('google.com')).rejects.toThrow('Provider login not available in SSO consumer mode')
   })
 
   it('should throw when using email/password login in consumer mode', async () => {

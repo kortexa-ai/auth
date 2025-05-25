@@ -1,27 +1,46 @@
 // types.ts
-import type { Auth, AuthProvider, User } from 'firebase/auth';
-import { GithubAuthProvider, GoogleAuthProvider, TwitterAuthProvider } from 'firebase/auth';
+import type { Auth, User } from "firebase/auth";
+import {
+    GithubAuthProvider,
+    GoogleAuthProvider,
+    TwitterAuthProvider,
+    type OAuthCredential,
+} from "firebase/auth";
 
 export const googleAuthProvider = new GoogleAuthProvider();
-googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
+googleAuthProvider.setCustomParameters({ prompt: "select_account" });
 
 export const githubAuthProvider = new GithubAuthProvider();
 
 export const twitterAuthProvider = new TwitterAuthProvider();
 
-export const SUPPORTED_PROVIDERS = ['google', 'github', 'twitter', 'apple'] as const;
-export type SupportedProviders = typeof SUPPORTED_PROVIDERS[number];
+export const SUPPORTED_PROVIDERS = [
+    "google.com",
+    "github.com",
+    "twitter.com",
+    "apple.com",
+    "x.com",
+] as const;
+export type SupportedProviders = (typeof SUPPORTED_PROVIDERS)[number];
 
-export const AuthProviders = new Map<SupportedProviders | 'email', AuthProvider | null>([
-    ['google', googleAuthProvider],
-    ['github', githubAuthProvider],
-    ['twitter', twitterAuthProvider],
-    ['apple', null],
-    ['email', null]
+export const AuthProviders = new Map<
+    SupportedProviders | "email",
+    GoogleAuthProvider | GithubAuthProvider | TwitterAuthProvider | null
+>([
+    ["google.com", googleAuthProvider],
+    ["github.com", githubAuthProvider],
+    ["twitter.com", twitterAuthProvider],
+    ["x.com", twitterAuthProvider],
+    ["apple.com", null],
+    ["email", null],
 ]);
 
-export const AUTH_MODES = ['standalone', 'sso-provider', 'sso-consumer'] as const;
-export type AuthMode = typeof AUTH_MODES[number];
+export const AUTH_MODES = [
+    "standalone",
+    "sso-provider",
+    "sso-consumer",
+] as const;
+export type AuthMode = (typeof AUTH_MODES)[number];
 
 export interface AuthState {
     currentUser: User | null;
@@ -30,6 +49,7 @@ export interface AuthState {
     mode: AuthMode;
     allowAnonymous: boolean;
     forceLogin: boolean;
+    linkCredential: OAuthCredential | null;
 }
 
 /**
@@ -49,6 +69,7 @@ export interface AuthContextType extends AuthState {
         email: string,
         password: string
     ) => Promise<void>;
+    link: () => Promise<void>;
     logout: () => Promise<void>;
     clearForceLogin: () => void;
 }

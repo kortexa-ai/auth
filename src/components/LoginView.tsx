@@ -1,9 +1,10 @@
-import { useState, type ReactNode, type PropsWithChildren, useCallback, useEffect } from 'react';
+import { useState, type ReactNode, type PropsWithChildren, useCallback, useEffect, useMemo } from 'react';
 import { LogIn, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { LoginForm } from './LoginForm';
 import type { SupportedProviders } from '../auth/types';
 import { useAuth } from '../auth/hooks/useAuth';
+import { LinkForm } from './LinkForm';
 
 interface LoginViewProps {
     title: ReactNode;
@@ -14,6 +15,7 @@ interface LoginViewProps {
 interface LoginState {
     showForm: boolean;
     showError: boolean;
+    showLinkForm: boolean;
     errorMessage: string;
     isLoading: boolean;
 }
@@ -29,20 +31,23 @@ export function LoginView({
     background,
     children,
 }: PropsWithChildren<LoginViewProps>) {
-    const { currentUser, mode, allowAnonymous, forceLogin, loginWithProvider, loginWithSSO } = useAuth();
+    const { currentUser, mode, allowAnonymous, forceLogin, linkCredential, loginWithProvider, loginWithSSO } = useAuth();
 
     const [loginState, setLoginState] = useState<LoginState>({
         showForm: false,
         showError: false,
+        showLinkForm: false,
         errorMessage: '',
         isLoading: false,
     });
 
     useEffect(() => {
-        if (forceLogin) {
-            setLoginState((prev) => ({ ...prev, showForm: true }));
+        if (linkCredential) {
+            setLoginState((prev) => ({ ...prev, showForm: false, showLinkForm: true }));
+        } else if (forceLogin) {
+            setLoginState((prev) => ({ ...prev, showForm: true, showLinkForm: false }));
         }
-    }, [forceLogin]);
+    }, [forceLogin, linkCredential]);
 
     const onLoginClick = useCallback(async () => {
         if (mode === 'sso-consumer') {
@@ -50,11 +55,21 @@ export function LoginView({
             await loginWithSSO();
             setLoginState((prev) => ({ ...prev, isLoading: false }));
         } else if (!defaultProvider) {
-            setLoginState((prev) => ({
-                ...prev,
-                showForm: !prev.showForm,
-                showError: false, // Reset error on toggle
-            }));
+            if (!loginState.showForm && !loginState.showLinkForm) {
+                setLoginState((prev) => ({
+                    ...prev,
+                    showForm: true,
+                    showLinkForm: false,
+                    showError: false,
+                }));
+            } else {
+                setLoginState((prev) => ({
+                    ...prev,
+                    showForm: false,
+                    showLinkForm: false,
+                    showError: false,
+                }));
+            }
         } else {
             setLoginState((prev) => ({ ...prev, isLoading: true }));
             try {
@@ -69,7 +84,7 @@ export function LoginView({
                 setLoginState((prev) => ({ ...prev, isLoading: false }));
             }
         }
-    }, [defaultProvider, mode, loginWithSSO, loginWithProvider]);
+    }, [defaultProvider, mode, loginWithSSO, loginWithProvider, loginState.showForm, loginState.showLinkForm]);
 
     const onLoginError = useCallback((error?: string) => {
         setLoginState((prev) => ({
@@ -79,7 +94,12 @@ export function LoginView({
         }));
     }, []);
 
-    const noLoginRequired = (currentUser || allowAnonymous) && !forceLogin;
+    const noLoginRequired = useMemo(() => {
+        return (currentUser || allowAnonymous) && !forceLogin;
+    }, [currentUser, allowAnonymous, forceLogin]);
+    const showChildForm = useMemo(() => {
+        return (loginState.showForm || loginState.showLinkForm) && !noLoginRequired;
+    }, [loginState.showForm, loginState.showLinkForm, noLoginRequired]);
 
     return (noLoginRequired
         ? children
@@ -104,13 +124,13 @@ export function LoginView({
                         mx-4
                         border border-white/30
                         transition-all duration-500 ease-in-out delay-150
-                        ${loginState.showForm
+                        ${showChildForm
                             ? 'scale-100 opacity-100 px-6 pt-6 pb-6'
                             : 'scale-90 opacity-90 px-4 py-3 flex items-center justify-center'}
                     `}
                 >
-                    <div className={`flex flex-col items-center gap-4 ${!loginState.showForm ? 'w-full' : ''}`}>
-                        <div className={`flex items-center gap-3 ${!loginState.showForm ? 'justify-center' : ''}`}>
+                    <div className={`flex flex-col items-center gap-4 ${!showChildForm ? 'w-full' : ''}`}>
+                        <div className={`flex items-center gap-3 ${!showChildForm ? 'justify-center' : ''}`}>
                             <h1 className="text-3xl font-mono text-zinc-800">{title}</h1>
                             <Button
                                 onClick={onLoginClick}
@@ -119,11 +139,11 @@ export function LoginView({
                                 className={`
                                     rounded-full hover:bg-zinc-100 hover:shadow-lg hover:scale-110
                                     transition-all duration-300
-                                    ${loginState.showForm ? 'rotate-180' : 'rotate-0'}
+                                    ${showChildForm ? 'rotate-180' : 'rotate-0'}
                                 `}
                                 disabled={loginState.isLoading}
                             >
-                                {loginState.showForm ? (
+                                {showChildForm ? (
                                     <X
                                         className={`
                                             h-5 w-5 ${loginState.isLoading ? 'animate-spin' : 'animate-pulse'}
@@ -166,6 +186,19 @@ export function LoginView({
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        )}
+
+                        {loginState.showLinkForm && (
+                            <div
+                                className={`
+                                    transition-all duration-300 ease-in-out
+                                    ${loginState.showLinkForm
+                                        ? 'opacity-100 translate-y-0 scale-100'
+                                        : 'opacity-0 translate-y-4 scale-95 pointer-events-none h-0'}
+                            `}
+                            >
+                                <LinkForm />
                             </div>
                         )}
                     </div>

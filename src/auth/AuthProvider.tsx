@@ -1,9 +1,23 @@
 import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-import { signInWithPopup, signInWithCustomToken, signOut, onAuthStateChanged, type User, signInWithEmailAndPassword, browserPopupRedirectResolver } from 'firebase/auth';
+import type { User, AuthError } from 'firebase/auth';
+import {
+    onAuthStateChanged,
+    signInWithPopup,
+    signInWithEmailAndPassword,
+    signInWithCustomToken,
+    linkWithCredential,
+    signOut,
+    browserPopupRedirectResolver,
+    AuthErrorCodes,
+    GoogleAuthProvider,
+    GithubAuthProvider,
+    TwitterAuthProvider,
+} from 'firebase/auth';
 import type { AuthMode, AuthProviderProps, AuthState, SSOResponse } from './types';
-import { AuthProviders, type SupportedProviders } from './types';
+import { AuthProviders, googleAuthProvider, type SupportedProviders } from './types';
 import { AuthContext } from './AuthContext';
 import { LoginView } from '../components/LoginView';
+import type { FirebaseError } from 'firebase/app';
 
 /**
  * Universal authentication provider that handles all auth modes:
@@ -29,9 +43,12 @@ export function AuthProvider({
      */
     const mode = useMemo<AuthMode>(() => {
         const params = new URLSearchParams(window.location.search);
-        if (params.has('token')) return 'sso-consumer';
+
         if (params.has('returnUrl')) return 'sso-provider';
+
+        if (params.has('token')) return 'sso-consumer';
         if (loginRedirect && !params.has('no_sso')) return 'sso-consumer';
+
         return 'standalone';
     }, [loginRedirect]);
 
@@ -45,6 +62,7 @@ export function AuthProvider({
         mode: mode,
         allowAnonymous: allowAnonymous,
         forceLogin: false,
+        linkCredential: null,
     });
 
     /**
@@ -127,10 +145,14 @@ export function AuthProvider({
      * @param token Firebase JWT token
      */
     const handleProviderRedirect = useCallback(async (token: string) => {
-        const params = new URLSearchParams(window.location.search);
-        const returnUrl = params.get('returnUrl');
+        if (mode === 'sso-provider') {
+            const params = new URLSearchParams(window.location.search);
+            const returnUrl = params.get('returnUrl');
 
-        if (returnUrl && mode === 'sso-provider') {
+            if (!returnUrl) {
+                throw new Error('Return URL not found');
+            }
+
             try {
                 // Get custom token for the specific domain
                 const customToken = await exchangeToken(token, (new URL(returnUrl)).hostname);
@@ -149,7 +171,7 @@ export function AuthProvider({
      * Initiates the login flow and shows the login form
      */
     const login = useCallback(() => {
-        setState((prev) => ({ ...prev, forceLogin: true }));
+        setState((prev) => ({ ...prev, forceLogin: true, linkCredential: null }));
     }, [setState]);
 
     /**
@@ -184,8 +206,43 @@ export function AuthProvider({
         const provider = AuthProviders.get(providerName);
         if (!provider) throw new Error(`Invalid provider: ${providerName}`);
 
-        // Trigger Firebase popup authentication
-        await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+        try {
+            await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+        } catch (error) {
+            if ((error as FirebaseError).code === AuthErrorCodes.NEED_CONFIRMATION) {
+                const authError = error as AuthError;
+
+                let credential = null;
+
+                if (providerName === 'google.com') {
+                    credential = GoogleAuthProvider.credentialFromError(authError);
+                } else if (providerName === 'github.com') {
+                    credential = GithubAuthProvider.credentialFromError(authError);
+                } else if (providerName === 'twitter.com') {
+                    credential = TwitterAuthProvider.credentialFromError(authError);
+                } else if (providerName === 'x.com') {
+                    credential = TwitterAuthProvider.credentialFromError(authError);
+                }
+
+                if (!credential) {
+                    throw error;
+                }
+
+                const tokenResponse = (error as FirebaseError).customData?._tokenResponse;
+                if (tokenResponse && tokenResponse instanceof Object) {
+                    // Get tokenResponse.verifiedProvider[0]
+                    const verifiedProviderName = (tokenResponse as { verifiedProvider: string[] })['verifiedProvider'][0] as SupportedProviders;
+                    const verifiedProvider = AuthProviders.get(verifiedProviderName);
+                    if (!verifiedProvider) {
+                        throw error;
+                    }
+
+                    setState((prev) => ({ ...prev, linkCredential: credential }));
+                } else {
+                    throw error;
+                }
+            }
+        }
     }, [auth, mode]);
 
     /**
@@ -206,17 +263,29 @@ export function AuthProvider({
     }, [auth, mode]);
 
     /**
+     * Links the current user with the provided credential
+     */
+    const link = useCallback(async () => {
+        if (!state.linkCredential) {
+            throw new Error('No link credential provided');
+        }
+
+        await signInWithPopup(auth, googleAuthProvider, browserPopupRedirectResolver);
+    }, [auth, state.linkCredential]);
+
+    /**
      * Signs out the current user
      */
     const logout = useCallback(async () => {
         await signOut(auth);
+        setState((prev) => ({ ...prev, forceLogin: false, linkCredential: null }));
     }, [auth]);
 
     /**
      * Clear the force login state
      */
     const clearForceLogin = useCallback(() => {
-        setState((prev) => ({ ...prev, forceLogin: false }));
+        setState((prev) => ({ ...prev, forceLogin: false, linkCredential: null }));
     }, [setState]);
 
     /**
@@ -235,20 +304,24 @@ export function AuthProvider({
             if (!mounted) return;
 
             if (user) {
-                // User is signed in, get token and update state
+                // User is signed in, link if needed, get token and update state
+                if (state.linkCredential) {
+                    await linkWithCredential(user, state.linkCredential);
+                }
+
                 const newToken = await user.getIdToken();
+
                 setState(prev => ({
                     ...prev,
                     currentUser: user,
                     token: newToken,
                     loading: false,
-                    forceLogin: false
+                    forceLogin: false,
+                    linkCredential: null,
                 }));
 
                 // Handle redirect flow for SSO provider mode
-                if (mode === 'sso-provider') {
-                    await handleProviderRedirect(newToken);
-                }
+                await handleProviderRedirect(newToken);
             } else {
                 // User is signed out, clear state
                 setState(prev => ({
@@ -256,7 +329,7 @@ export function AuthProvider({
                     currentUser: null,
                     token: "",
                     loading: false,
-                    forceLogin: false
+                    forceLogin: false,
                 }));
             }
         };
@@ -280,7 +353,7 @@ export function AuthProvider({
                 window.history.replaceState({}, '', cleanUrl);
             } catch (error) {
                 console.error('SSO token signin failed:', error);
-                setState(prev => ({ ...prev, loading: false, forceLogin: false }));
+                setState(prev => ({ ...prev, loading: false, forceLogin: false, linkCredential: null }));
             }
         };
 
@@ -295,7 +368,7 @@ export function AuthProvider({
             mounted = false;
             unsubAuthState();
         };
-    }, [auth, mode, handleProviderRedirect]);
+    }, [auth, mode, handleProviderRedirect, state.linkCredential]);
 
     /**
      * Context value exposed to consumers
@@ -307,10 +380,11 @@ export function AuthProvider({
         loginWithSSO,
         loginWithProvider,
         loginWithEmailAndPassword,
+        link,
         logout,
         clearForceLogin,
         mode
-    }), [state, login, loginWithSSO, loginWithProvider, loginWithEmailAndPassword, logout, clearForceLogin, mode]);
+    }), [state, login, loginWithSSO, loginWithProvider, loginWithEmailAndPassword, link, logout, clearForceLogin, mode]);
 
     // Set display name for debugging purposes
     AuthContext.displayName = `kortexa.ai:auth:${mode}`;

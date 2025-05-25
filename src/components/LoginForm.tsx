@@ -1,7 +1,6 @@
 import { SiGithub, SiGoogle } from '@icons-pack/react-simple-icons';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { useState, type FormEvent, useCallback } from 'react';
+import { useCallback } from 'react';
 import { AuthProviders, type SupportedProviders } from '../auth/types';
 import { useAuth } from '../auth/hooks/useAuth';
 
@@ -10,19 +9,20 @@ interface LoginProps {
 }
 
 export function LoginForm({ onLoginError }: LoginProps) {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    // const [email, setEmail] = useState('');
+    // const [password, setPassword] = useState('');
 
-    const { loginWithProvider, loginWithEmailAndPassword, clearForceLogin } = useAuth();
+    // const { loginWithProvider, loginWithEmailAndPassword, clearForceLogin } = useAuth();
+    const { loginWithProvider } = useAuth();
 
-    const handleSubmit = useCallback(async (e: FormEvent) => {
-        e.preventDefault();
-        try {
-            await loginWithEmailAndPassword(email, password);
-        } catch (err) {
-            onLoginError((err as Error).message);
-        }
-    }, [email, password, loginWithEmailAndPassword, onLoginError]);
+    // const handleSubmit = useCallback(async (e: FormEvent) => {
+    //     e.preventDefault();
+    //     try {
+    //         await loginWithEmailAndPassword(email, password);
+    //     } catch (err) {
+    //         onLoginError((err as Error).message);
+    //     }
+    // }, [email, password, loginWithEmailAndPassword, onLoginError]);
 
     const handleLogin = useCallback(async (provider: SupportedProviders) => {
         try {
@@ -32,16 +32,16 @@ export function LoginForm({ onLoginError }: LoginProps) {
         }
     }, [loginWithProvider, onLoginError]);
 
-    const handleReset = useCallback((e: FormEvent) => {
-        e.preventDefault();
-        clearForceLogin();
-        setEmail('');
-        setPassword('');
-    }, [clearForceLogin]);
+    // const handleReset = useCallback((e: FormEvent) => {
+    //     e.preventDefault();
+    //     clearForceLogin();
+    //     setEmail('');
+    //     setPassword('');
+    // }, [clearForceLogin]);
 
     return (
         <div className="w-full max-w-md p-6 bg-white rounded-xl shadow-md ring-1 ring-zinc-200/50">
-            {AuthProviders.has('email') && (
+            {/* {AuthProviders.has('email') && (
                 <form onSubmit={handleSubmit} onReset={handleReset} className="space-y-4">
                     <div className="space-y-1">
                         <Input
@@ -72,8 +72,7 @@ export function LoginForm({ onLoginError }: LoginProps) {
                 </form>
             )}
 
-            {/* Divider for social logins */}
-            {(AuthProviders.has('google') || AuthProviders.has('github')) && (
+            {(AuthProviders.has('google.com') || AuthProviders.has('github.com') || AuthProviders.has('twitter.com') || AuthProviders.has('x.com')) && (
                 <div className="relative my-6">
                     <div className="absolute inset-0 flex items-center">
                         <span className="w-full border-t border-zinc-300" />
@@ -82,30 +81,40 @@ export function LoginForm({ onLoginError }: LoginProps) {
                         <span className="bg-white px-2 text-zinc-500">Or continue with</span>
                     </div>
                 </div>
-            )}
+            )} */}
 
             {/* Social Buttons */}
             <div className="space-y-3">
-                {AuthProviders.has('google') && (
+                {AuthProviders.has('google.com') && (
                     <Button
                         variant="outline"
-                        onClick={() => handleLogin('google')}
+                        onClick={() => handleLogin('google.com')}
                         className="w-full flex items-center justify-center gap-2 border-zinc-300 text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-all duration-200"
                     >
                         <SiGoogle className="w-5 h-5 text-red-500" />
                         Sign in with Google
                     </Button>
                 )}
-                {AuthProviders.has('github') && (
+                {AuthProviders.has('github.com') && (
                     <Button
                         variant="outline"
-                        onClick={() => handleLogin('github')}
+                        onClick={() => handleLogin('github.com')}
                         className="w-full flex items-center justify-center gap-2 border-zinc-300 text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-all duration-200"
                     >
                         <SiGithub className="w-5 h-5 text-gray-800" />
                         Sign in with GitHub
                     </Button>
                 )}
+                {/* {(AuthProviders.has('twitter.com') || AuthProviders.has('x.com')) && (
+                    <Button
+                        variant="outline"
+                        onClick={() => handleLogin('x.com')}
+                        className="w-full flex items-center justify-center gap-2 border-zinc-300 text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-all duration-200"
+                    >
+                        <SiX className="w-5 h-5 text-blue-500" />
+                        Sign in with X
+                    </Button>
+                )} */}
             </div>
         </div>
     );
