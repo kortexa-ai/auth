@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2025-05-24
+
+### Added
+- Support for linking providers by email
+
 ## [0.1.3] - 2025-05-20
 
 ### Added
