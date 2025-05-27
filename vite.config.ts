@@ -35,8 +35,8 @@ export default defineConfig({
         rollupOptions: {
             external: [
                 "react",
-                "react/jsx-runtime",
                 "react-dom",
+                "react/jsx-runtime",
                 "firebase",
                 "firebase/app",
                 "firebase/auth",
@@ -44,8 +44,8 @@ export default defineConfig({
             output: {
                 globals: {
                     react: "React",
-                    "react/jsx-runtime": "jsxRuntime",
                     "react-dom": "ReactDOM",
+                    "react/jsx-runtime": "jsxRuntime",
                     firebase: "firebase",
                     "firebase/app": "firebase.app",
                     "firebase/auth": "firebase.auth",
