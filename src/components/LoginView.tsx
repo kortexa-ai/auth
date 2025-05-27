@@ -13,9 +13,9 @@ interface LoginViewProps {
 }
 
 interface LoginState {
-    showForm: boolean;
-    showError: boolean;
+    showLoginForm: boolean;
     showLinkForm: boolean;
+    showError: boolean;
     errorMessage: string;
     isLoading: boolean;
 }
@@ -31,10 +31,10 @@ export function LoginView({
     background,
     children,
 }: PropsWithChildren<LoginViewProps>) {
-    const { currentUser, mode, allowAnonymous, forceLogin, linkCredential, loginWithProvider, loginWithSSO } = useAuth();
+    const { currentUser, mode, allowAnonymous, forceLogin, linkCredential, loginWithProvider, loginWithSSO, clearForceLogin } = useAuth();
 
     const [loginState, setLoginState] = useState<LoginState>({
-        showForm: false,
+        showLoginForm: false,
         showError: false,
         showLinkForm: false,
         errorMessage: '',
@@ -43,9 +43,9 @@ export function LoginView({
 
     useEffect(() => {
         if (linkCredential) {
-            setLoginState((prev) => ({ ...prev, showForm: false, showLinkForm: true }));
+            setLoginState((prev) => ({ ...prev, showLoginForm: false, showLinkForm: true }));
         } else if (forceLogin) {
-            setLoginState((prev) => ({ ...prev, showForm: true, showLinkForm: false }));
+            setLoginState((prev) => ({ ...prev, showLoginForm: true, showLinkForm: false }));
         }
     }, [forceLogin, linkCredential]);
 
@@ -55,17 +55,18 @@ export function LoginView({
             await loginWithSSO();
             setLoginState((prev) => ({ ...prev, isLoading: false }));
         } else if (!defaultProvider) {
-            if (!loginState.showForm && !loginState.showLinkForm) {
+            if (!loginState.showLoginForm && !loginState.showLinkForm) {
                 setLoginState((prev) => ({
                     ...prev,
-                    showForm: true,
+                    showLoginForm: true,
                     showLinkForm: false,
                     showError: false,
                 }));
             } else {
+                clearForceLogin();
                 setLoginState((prev) => ({
                     ...prev,
-                    showForm: false,
+                    showLoginForm: false,
                     showLinkForm: false,
                     showError: false,
                 }));
@@ -84,7 +85,7 @@ export function LoginView({
                 setLoginState((prev) => ({ ...prev, isLoading: false }));
             }
         }
-    }, [defaultProvider, mode, loginWithSSO, loginWithProvider, loginState.showForm, loginState.showLinkForm]);
+    }, [defaultProvider, mode, loginWithSSO, loginWithProvider, clearForceLogin, loginState.showLoginForm, loginState.showLinkForm]);
 
     const onLoginError = useCallback((error?: string) => {
         setLoginState((prev) => ({
@@ -98,8 +99,8 @@ export function LoginView({
         return (currentUser || allowAnonymous) && !forceLogin;
     }, [currentUser, allowAnonymous, forceLogin]);
     const showChildForm = useMemo(() => {
-        return (loginState.showForm || loginState.showLinkForm) && !noLoginRequired;
-    }, [loginState.showForm, loginState.showLinkForm, noLoginRequired]);
+        return (loginState.showLoginForm || loginState.showLinkForm);
+    }, [loginState.showLoginForm, loginState.showLinkForm]);
 
     return (noLoginRequired
         ? children
@@ -161,11 +162,11 @@ export function LoginView({
                             </Button>
                         </div>
 
-                        {loginState.showForm && (
+                        {loginState.showLoginForm && (
                             <div
                                 className={`
                                     transition-all duration-300 ease-in-out
-                                    ${loginState.showForm
+                                    ${loginState.showLoginForm
                                         ? 'opacity-100 translate-y-0 scale-100'
                                         : 'opacity-0 translate-y-4 scale-95 pointer-events-none h-0'}
                             `}

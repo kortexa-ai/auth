@@ -58,6 +58,7 @@ export interface AuthState {
  * @method loginWithSSO - Login with SSO
  * @method loginWithProvider - Login with a provider
  * @method loginWithEmailAndPassword - Login with email and password
+ * @method link - Link a provider to the current user
  * @method logout - Logout
  * @method clearForceLogin - Clear the force login state
  */

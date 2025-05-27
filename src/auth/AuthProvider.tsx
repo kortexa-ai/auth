@@ -279,7 +279,7 @@ export function AuthProvider({
     const logout = useCallback(async () => {
         await signOut(auth);
         setState((prev) => ({ ...prev, forceLogin: false, linkCredential: null }));
-    }, [auth]);
+    }, [auth, setState]);
 
     /**
      * Clear the force login state
