@@ -1,5 +1,5 @@
 import { useState, type ReactNode, type PropsWithChildren, useCallback, useEffect, useMemo } from 'react';
-import { LogIn, X } from 'lucide-react';
+import { LogIn, X } from 'lucide-react'; // LogIn might be used for a loading spinner
 import { Button } from './ui/button';
 import { LoginForm } from './LoginForm';
 import type { SupportedProviders } from '../auth/types';
@@ -7,204 +7,197 @@ import { useAuth } from '../auth/hooks/useAuth';
 import { LinkForm } from './LinkForm';
 
 interface LoginViewProps {
-    title: ReactNode;
-    defaultProvider?: SupportedProviders;
+    title?: ReactNode;
     background?: ReactNode;
-}
-
-interface LoginState {
-    showLoginForm: boolean;
-    showLinkForm: boolean;
-    showError: boolean;
-    errorMessage: string;
-    isLoading: boolean;
+    defaultProvider?: SupportedProviders;
+    enabledProviders?: SupportedProviders[];
 }
 
 /**
- * Handles authentication flow with an animated in-place login form
- * The white card background collapses/expands with the form using Tailwind Animate
- * Login button toggles form visibility with refined animations
+ * Handles authentication flow. Renders children if authenticated or anonymous access is allowed.
+ * Otherwise, displays a login/linking UI based on auth state (forceLogin, linkCredential, etc.).
  */
 export function LoginView({
     title,
-    defaultProvider,
     background,
+    defaultProvider,
+    enabledProviders,
     children,
 }: PropsWithChildren<LoginViewProps>) {
-    const { currentUser, mode, allowAnonymous, forceLogin, linkCredential, loginWithProvider, loginWithSSO, clearForceLogin } = useAuth();
+    const {
+        currentUser,
+        mode,
+        allowAnonymous,
+        forceLogin,
+        linkCredential,
+        loginWithProvider,
+        loginWithSSO,
+        clearForceLogin,
+        loading: authIsLoading, // loading state from the auth context
+    } = useAuth();
 
-    const [loginState, setLoginState] = useState<LoginState>({
-        showLoginForm: false,
+    const [localErrorState, setLocalErrorState] = useState<{ showError: boolean; errorMessage: string }>({
         showError: false,
-        showLinkForm: false,
         errorMessage: '',
-        isLoading: false,
     });
 
+    // Determine if the main login UI (modal/card) should be visible
+    const isLoginUIActive = useMemo(() => {
+        return forceLogin || !!linkCredential || (!allowAnonymous && !currentUser);
+    }, [forceLogin, linkCredential, allowAnonymous, currentUser]);
+
+    // Determine if children (authenticated content) should be shown
+    const shouldShowChildren = useMemo(() => {
+        // If allowAnonymous is true, children are always shown (potentially under the login form).
+        // If allowAnonymous is false, children are shown only when the login UI is not active and there's a user.
+        return allowAnonymous || (!isLoginUIActive && !!currentUser);
+    }, [allowAnonymous, isLoginUIActive, currentUser]);
+
+    const shouldShowLinkForm = useMemo(() => isLoginUIActive && !!linkCredential, [isLoginUIActive, linkCredential]);
+    const shouldShowLoginFormCore = useMemo(() => isLoginUIActive && !linkCredential, [isLoginUIActive, linkCredential]);
+
+    // Effect for automatic SSO login if in sso-consumer mode
     useEffect(() => {
-        if (linkCredential) {
-            setLoginState((prev) => ({ ...prev, showLoginForm: false, showLinkForm: true }));
-        } else if (forceLogin) {
-            setLoginState((prev) => ({ ...prev, showLoginForm: true, showLinkForm: false }));
+        if (shouldShowLoginFormCore && mode === 'sso-consumer' && !authIsLoading && !localErrorState.showError) {
+            (async () => {
+                try {
+                    setLocalErrorState({ showError: false, errorMessage: '' }); // Clear previous errors
+                    await loginWithSSO();
+                    // On success, currentUser will update, isLoginUIActive will become false, children will show.
+                } catch (err) {
+                    setLocalErrorState({
+                        showError: true,
+                        errorMessage: err instanceof Error ? err.message : 'SSO login failed. Please try again.',
+                    });
+                }
+            })();
         }
-    }, [forceLogin, linkCredential]);
+    }, [shouldShowLoginFormCore, mode, loginWithSSO, authIsLoading, localErrorState.showError, setLocalErrorState]);
 
-    const onLoginClick = useCallback(async () => {
-        if (mode === 'sso-consumer') {
-            setLoginState((prev) => ({ ...prev, isLoading: true }));
-            await loginWithSSO();
-            setLoginState((prev) => ({ ...prev, isLoading: false }));
-        } else if (!defaultProvider) {
-            if (!loginState.showLoginForm && !loginState.showLinkForm) {
-                setLoginState((prev) => ({
-                    ...prev,
-                    showLoginForm: true,
-                    showLinkForm: false,
-                    showError: false,
-                }));
-            } else {
-                clearForceLogin();
-                setLoginState((prev) => ({
-                    ...prev,
-                    showLoginForm: false,
-                    showLinkForm: false,
-                    showError: false,
-                }));
-            }
-        } else {
-            setLoginState((prev) => ({ ...prev, isLoading: true }));
-            try {
-                await loginWithProvider(defaultProvider);
-            } catch (err) {
-                setLoginState((prev) => ({
-                    ...prev,
-                    showError: true,
-                    errorMessage: err instanceof Error ? err.message : 'Login failed',
-                }));
-            } finally {
-                setLoginState((prev) => ({ ...prev, isLoading: false }));
-            }
+    // Effect for automatic login with defaultProvider
+    useEffect(() => {
+        if (shouldShowLoginFormCore && defaultProvider && mode !== 'sso-consumer' && !authIsLoading && !localErrorState.showError) {
+            (async () => {
+                try {
+                    setLocalErrorState({ showError: false, errorMessage: '' }); // Clear previous errors
+                    await loginWithProvider(defaultProvider);
+                    // On success, currentUser will update, isLoginUIActive will become false, children will show.
+                } catch (err) {
+                    setLocalErrorState({
+                        showError: true,
+                        errorMessage: err instanceof Error ? err.message : `Login with ${defaultProvider} failed. Please try again.`,
+                    });
+                }
+            })();
         }
-    }, [defaultProvider, mode, loginWithSSO, loginWithProvider, clearForceLogin, loginState.showLoginForm, loginState.showLinkForm]);
+    }, [shouldShowLoginFormCore, defaultProvider, mode, loginWithProvider, authIsLoading, localErrorState.showError, setLocalErrorState]);
 
-    const onLoginError = useCallback((error?: string) => {
-        setLoginState((prev) => ({
-            ...prev,
+    const handleCloseLoginUI = useCallback(() => {
+        clearForceLogin();
+        setLocalErrorState({ showError: false, errorMessage: '' });
+    }, [clearForceLogin, setLocalErrorState]);
+
+    // Effect for 'Escape' key to close login UI
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && isLoginUIActive) {
+                handleCloseLoginUI();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isLoginUIActive, handleCloseLoginUI]);
+
+    const onLoginFormError = useCallback((error?: string) => {
+        setLocalErrorState({
             showError: true,
-            errorMessage: error ?? 'Login failed',
-        }));
-    }, []);
+            errorMessage: error ?? 'Login failed from form. Please try again.',
+        });
+    }, [setLocalErrorState]);
 
-    const noLoginRequired = useMemo(() => {
-        return (currentUser || allowAnonymous) && !forceLogin;
-    }, [currentUser, allowAnonymous, forceLogin]);
-    const showChildForm = useMemo(() => {
-        return (loginState.showLoginForm || loginState.showLinkForm);
-    }, [loginState.showLoginForm, loginState.showLinkForm]);
+    // Determine if the manual LoginForm (with provider buttons, etc.) should be shown
+    const showManualLoginForm = useMemo(() => {
+        if (authIsLoading || !shouldShowLoginFormCore || mode === 'sso-consumer') {
+            return false;
+        }
+        // Show form if no default provider was specified, OR if there was a defaultProvider attempt that resulted in an error.
+        return !defaultProvider || localErrorState.showError;
+    }, [authIsLoading, shouldShowLoginFormCore, mode, defaultProvider, localErrorState.showError]);
 
-    return (noLoginRequired
-        ? children
-        : <div className="relative h-screen w-screen overflow-hidden">
-            {/* Background Layer (unchanged full size) */}
-            {background && (
-                <div className="absolute inset-0 z-0">
-                    {background}
-                </div>
+    // If allowAnonymous is false, and we should show children, then we *only* show children.
+    // This handles the case where the user is logged in and no login UI is forced.
+    if (!allowAnonymous && shouldShowChildren) {
+        return <>{children}</>;
+    }
+
+    // In all other cases (allowAnonymous is true, or login UI is active),
+    // we render the main layout which might include children and/or the login UI.
+    return (
+        <div className="flex h-screen w-screen relative">
+            {/* Render children if:
+                1. Anonymous access is allowed (they can act as background or main content).
+                2. OR if anonymous is not allowed, but user is authenticated and login UI is not active (handled by the early return above, but this condition is for clarity if that changes).
+                   Actually, shouldShowChildren already covers this: allowAnonymous || (!isLoginUIActive && !!currentUser)
+            */}
+            {shouldShowChildren && (
+                <>{children}</>
             )}
 
-            {/* Foreground Content */}
-            <div className="relative z-10 h-full flex items-center justify-center">
-                <div
-                    className={`
-                        bg-white/90
-                        backdrop-blur-md
-                        rounded-2xl
-                        shadow-xl
-                        max-w-md
-                        w-full
-                        mx-4
-                        border border-white/30
-                        transition-all duration-500 ease-in-out delay-150
-                        ${showChildForm
-                            ? 'scale-100 opacity-100 px-6 pt-6 pb-6'
-                            : 'scale-90 opacity-90 px-4 py-3 flex items-center justify-center'}
-                    `}
-                >
-                    <div className={`flex flex-col items-center gap-4 ${!showChildForm ? 'w-full' : ''}`}>
-                        <div className={`flex items-center gap-3 ${!showChildForm ? 'justify-center' : ''}`}>
-                            <h1 className="text-3xl font-mono text-zinc-800">{title}</h1>
-                            <Button
-                                onClick={onLoginClick}
-                                variant="ghost"
-                                size="icon"
-                                className={`
-                                    rounded-full hover:bg-zinc-100 hover:shadow-lg hover:scale-110
-                                    transition-all duration-300
-                                    ${showChildForm ? 'rotate-180' : 'rotate-0'}
-                                `}
-                                disabled={loginState.isLoading}
-                            >
-                                {showChildForm ? (
-                                    <X
-                                        className={`
-                                            h-5 w-5 ${loginState.isLoading ? 'animate-spin' : 'animate-pulse'}
-                                            text-zinc-600 hover:text-red-500 transition-colors
-                                        `}
-                                    />
-                                ) : (
-                                    <LogIn
-                                        className={`
-                                            h-5 w-5 ${loginState.isLoading ? 'animate-spin' : 'animate-pulse'}
-                                            text-zinc-600 hover:text-blue-500 transition-colors
-                                        `}
-                                    />
-                                )}
-                            </Button>
-                        </div>
-
-                        {loginState.showLoginForm && (
-                            <div
-                                className={`
-                                    transition-all duration-300 ease-in-out
-                                    ${loginState.showLoginForm
-                                        ? 'opacity-100 translate-y-0 scale-100'
-                                        : 'opacity-0 translate-y-4 scale-95 pointer-events-none h-0'}
-                            `}
-                            >
-                                <LoginForm onLoginError={onLoginError} />
-                                <div
-                                    className={`
-                                    transition-all duration-200 ease-in-out
-                                    ${loginState.showError
-                                            ? 'opacity-100 translate-x-0'
-                                            : 'opacity-0 -translate-x-4 pointer-events-none h-0'}
-                                `}
+            {/* Login UI (Modal) - Renders only if isLoginUIActive is true */}
+            {/* This will overlay children if allowAnonymous is true and children are also rendered. */}
+            {isLoginUIActive && (
+                <div className="absolute inset-0 h-screen w-screen overflow-hidden">
+                    {/* Background Layer */}
+                    {background}
+                    {/* Centered Content Layer */}
+                    <div className="absolute inset-0 flex items-center justify-center p-4">
+                        {/* Animated Card */}
+                        <div
+                            className={`
+                            relative bg-white rounded-xl shadow-2xl overflow-hidden ring-1 ring-zinc-200/50
+                            transition-all duration-300 ease-out
+                            w-full max-w-sm p-6 sm:p-8
+                            ${isLoginUIActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}
+                        `}
+                        >
+                            {/* Card Header */}
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-semibold text-zinc-800">
+                                    {shouldShowLinkForm ? 'Link Account' : title || 'Login Required'}
+                                </h2>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleCloseLoginUI}
+                                    className="text-zinc-500 hover:text-zinc-700"
                                 >
-                                    {loginState.showError && (
-                                        <div className="mt-3 px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm text-center shadow-sm">
-                                            <span className="font-medium">Oops!</span>{' '}
-                                            {loginState.errorMessage || 'Failed to login. Please try again.'}
+                                    <X className="h-5 w-5" />
+                                </Button>
+                            </div>
+
+                            {/* Card Content: Loader, Forms, or Error Message */}
+                            {authIsLoading && (
+                                <div className="flex justify-center items-center py-8">
+                                    <LogIn className="h-8 w-8 animate-spin text-blue-600" />
+                                </div>
+                            )}
+
+                            {!authIsLoading && (
+                                <>
+                                    {showManualLoginForm && <LoginForm onLoginError={onLoginFormError} enabledProviders={enabledProviders} />}
+                                    {shouldShowLinkForm && <LinkForm /> /* Assuming LinkForm handles its own errors or doesn't need onLoginError */}
+
+                                    {localErrorState.showError && (
+                                        <div className="mt-4 text-center text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                                            {localErrorState.errorMessage}
                                         </div>
                                     )}
-                                </div>
-                            </div>
-                        )}
-
-                        {loginState.showLinkForm && (
-                            <div
-                                className={`
-                                    transition-all duration-300 ease-in-out
-                                    ${loginState.showLinkForm
-                                        ? 'opacity-100 translate-y-0 scale-100'
-                                        : 'opacity-0 translate-y-4 scale-95 pointer-events-none h-0'}
-                            `}
-                            >
-                                <LinkForm />
-                            </div>
-                        )}
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

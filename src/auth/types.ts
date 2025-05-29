@@ -4,34 +4,46 @@ import {
     GithubAuthProvider,
     GoogleAuthProvider,
     TwitterAuthProvider,
+    OAuthProvider,
     type OAuthCredential,
 } from "firebase/auth";
 
 export const googleAuthProvider = new GoogleAuthProvider();
 googleAuthProvider.setCustomParameters({ prompt: "select_account" });
+googleAuthProvider.addScope("profile");
+googleAuthProvider.addScope("email");
 
 export const githubAuthProvider = new GithubAuthProvider();
+githubAuthProvider.addScope("profile");
+githubAuthProvider.addScope("email");
 
 export const twitterAuthProvider = new TwitterAuthProvider();
+twitterAuthProvider.addScope("profile");
+twitterAuthProvider.addScope("email");
+
+export const appleAuthProvider = new OAuthProvider("apple.com");
+appleAuthProvider.addScope("profile");
+appleAuthProvider.addScope("email");
 
 export const SUPPORTED_PROVIDERS = [
     "google.com",
     "github.com",
     "twitter.com",
-    "apple.com",
     "x.com",
+    "apple.com",
+    "email",
 ] as const;
 export type SupportedProviders = (typeof SUPPORTED_PROVIDERS)[number];
 
 export const AuthProviders = new Map<
-    SupportedProviders | "email",
-    GoogleAuthProvider | GithubAuthProvider | TwitterAuthProvider | null
+    SupportedProviders,
+    GoogleAuthProvider | GithubAuthProvider | TwitterAuthProvider | OAuthProvider | null
 >([
     ["google.com", googleAuthProvider],
     ["github.com", githubAuthProvider],
     ["twitter.com", twitterAuthProvider],
     ["x.com", twitterAuthProvider],
-    ["apple.com", null],
+    ["apple.com", appleAuthProvider],
     ["email", null],
 ]);
 
