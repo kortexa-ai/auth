@@ -3,7 +3,7 @@ import { render, act, waitFor } from '@testing-library/react'
 import { AuthProvider } from '../AuthProvider'
 import { AuthContext } from '../AuthContext'
 import { useContext } from 'react'
-import { GithubAuthProvider, GoogleAuthProvider, TwitterAuthProvider, type Auth, type User } from 'firebase/auth'
+import { GithubAuthProvider, GoogleAuthProvider, OAuthProvider, TwitterAuthProvider, type Auth, type User } from 'firebase/auth'
 import type { AuthContextType } from '../types'
 
 const mockFirebaseAuth = vi.hoisted(() => ({
@@ -19,20 +19,31 @@ vi.mock('firebase/auth', async () => ({
   ...mockFirebaseAuth,
   GoogleAuthProvider: class MockGoogleProvider {
     setCustomParameters() { return this; }
+    addScope() { return this; }
   },
-  GithubAuthProvider: class MockGithubProvider { },
-  TwitterAuthProvider: class MockTwitterProvider { }
+  GithubAuthProvider: class MockGithubProvider {
+    addScope() { return this; }
+  },
+  TwitterAuthProvider: class MockTwitterProvider {
+    addScope() { return this; }
+  },
+  OAuthProvider: class MockOAuthProvider {
+    addScope() { return this; }
+  }
 }))
 
 vi.doMock('../types', () => ({
   googleAuthProvider: new GoogleAuthProvider(),
   githubAuthProvider: new GithubAuthProvider(),
   twitterAuthProvider: new TwitterAuthProvider(),
+  appleAuthProvider: new OAuthProvider("apple.com"),
   AuthProviders: new Map([
     ['google.com', new GoogleAuthProvider()],
     ['github.com', new GithubAuthProvider()],
     ['twitter.com', new TwitterAuthProvider()],
     ['x.com', new TwitterAuthProvider()],
+    ['apple.com', new OAuthProvider("apple.com")],
+    ['email', null],
   ]),
   AUTH_MODES: ['standalone', 'sso-provider', 'sso-consumer']
 }))
