@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7] - 2025-05-29
+
+### Added
+- Support for email login
+- Streamlined the default login form
+- Added support for customizing the providers list
+
 ## [0.1.4] - 2025-05-24
 
 ### Added
