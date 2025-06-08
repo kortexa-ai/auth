@@ -324,11 +324,14 @@ export function AuthProvider({
                 await handleProviderRedirect(newToken);
             } else {
                 // User is signed out, clear state
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
+                const loading = (token && mode == 'sso-consumer') ? true : false;
                 setState(prev => ({
                     ...prev,
                     currentUser: null,
                     token: "",
-                    loading: false,
+                    loading: loading,
                     forceLogin: false,
                 }));
             }
@@ -351,6 +354,11 @@ export function AuthProvider({
                 // Clean up URL by removing token parameter
                 const cleanUrl = `${window.location.origin}${window.location.pathname}`;
                 window.history.replaceState({}, '', cleanUrl);
+
+                setState(prev => ({
+                    ...prev,
+                    loading: false,
+                }));
             } catch (error) {
                 console.error('SSO token signin failed:', error);
                 setState(prev => ({ ...prev, loading: false, forceLogin: false, linkCredential: null }));
