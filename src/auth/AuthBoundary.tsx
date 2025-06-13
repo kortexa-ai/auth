@@ -7,7 +7,6 @@ export interface AuthBoundaryProps {
 
 export function AuthBoundary({ anonymous = null, children }: PropsWithChildren<AuthBoundaryProps>) {
     const { currentUser } = useAuth();
-    console.log(currentUser);
     return (
         currentUser ? children : anonymous
     );
